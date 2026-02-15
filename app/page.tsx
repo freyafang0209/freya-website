@@ -17,8 +17,11 @@ export default async function HomePage() {
         <h1 className="text-3xl font-bold tracking-tight text-gray-900">
           HigherEd Signals
         </h1>
-        <p className="mt-2 text-gray-600">
-          Insights and analysis on trends shaping higher education.
+        <p className="mt-2 text-lg font-medium text-gray-700">
+          Research-informed commentary and conceptual frameworks on higher education enrollment strategy, international student demand, and decision-making in volatile policy environments.
+        </p>
+        <p className="mt-3 text-gray-600">
+          HigherEd Signals publishes research-style commentary on how universities interpret early demand signals, manage enrollment risk, and adapt strategy in uncertain global markets. The focus is on behavior-based indicators, enrollment forecasting, and practical frameworks that help institutions act before late-cycle data becomes available.
         </p>
       </section>
 

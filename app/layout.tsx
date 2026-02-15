@@ -10,11 +10,11 @@ export const metadata: Metadata = {
     template: "%s | HigherEd Signals",
   },
   description:
-    "Insights and analysis on trends shaping higher education.",
+    "Research-informed commentary and conceptual frameworks on higher education enrollment strategy, international student demand, and decision-making in volatile policy environments.",
   openGraph: {
     title: "HigherEd Signals",
     description:
-      "Insights and analysis on trends shaping higher education.",
+      "Research-informed commentary and conceptual frameworks on higher education enrollment strategy, international student demand, and decision-making in volatile policy environments.",
     type: "website",
     locale: "en_US",
     siteName: "HigherEd Signals",
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "HigherEd Signals",
     description:
-      "Insights and analysis on trends shaping higher education.",
+      "Research-informed commentary and conceptual frameworks on higher education enrollment strategy, international student demand, and decision-making in volatile policy environments.",
   },
   robots: {
     index: true,
