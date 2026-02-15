@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { marked } from "marked";
 import { getArticles, getArticleBySlug, getArticleContent } from "@/lib/notion";
 
 export const revalidate = 60;
@@ -43,6 +44,29 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       canonical: `${siteUrl}/articles/${article.slug}`,
     },
   };
+}
+
+/** Notion sometimes inserts line breaks inside table cells, breaking markdown tables.
+ *  This rejoins split table rows so `marked` can parse them correctly. */
+function fixBrokenTables(md: string): string {
+  const lines = md.split("\n");
+  const fixed: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // A line that starts with | but doesn't end with | is a broken table row
+    if (line.startsWith("|") && !line.trimEnd().endsWith("|")) {
+      // Concatenate following lines until we find one ending with |
+      let joined = line;
+      while (i + 1 < lines.length && !joined.trimEnd().endsWith("|")) {
+        i++;
+        joined += " " + lines[i].trim();
+      }
+      fixed.push(joined);
+    } else {
+      fixed.push(line);
+    }
+  }
+  return fixed.join("\n");
 }
 
 export default async function ArticlePage({ params }: Props) {
@@ -100,58 +124,10 @@ export default async function ArticlePage({ params }: Props) {
         </header>
         <div
           className="article-content"
-          dangerouslySetInnerHTML={{ __html: markdownToHtml(content) }}
+          dangerouslySetInnerHTML={{ __html: marked.parse(fixBrokenTables(content)) as string }}
         />
       </article>
     </>
   );
 }
 
-/** Simple markdown-to-HTML conversion for rendered content */
-function markdownToHtml(md: string): string {
-  let html = md
-    // Code blocks (must come before inline code)
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>')
-    // Headings
-    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
-    .replace(/^## (.+)$/gm, "<h2>$1</h2>")
-    .replace(/^# (.+)$/gm, "<h1>$1</h1>")
-    // Bold and italic
-    .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    // Inline code
-    .replace(/`(.+?)`/g, "<code>$1</code>")
-    // Images
-    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" />')
-    // Links
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
-    // Horizontal rules
-    .replace(/^---$/gm, "<hr />")
-    // Blockquotes
-    .replace(/^> (.+)$/gm, "<blockquote>$1</blockquote>")
-    // Unordered lists
-    .replace(/^- (.+)$/gm, "<li>$1</li>")
-    // Line breaks to paragraphs
-    .replace(/\n\n/g, "</p><p>")
-    .replace(/\n/g, "<br />");
-
-  // Wrap in paragraph tags
-  html = `<p>${html}</p>`;
-
-  // Clean up empty paragraphs
-  html = html.replace(/<p>\s*<\/p>/g, "");
-  // Fix nested block elements inside <p>
-  html = html.replace(/<p>(<h[1-6]>)/g, "$1");
-  html = html.replace(/(<\/h[1-6]>)<\/p>/g, "$1");
-  html = html.replace(/<p>(<pre>)/g, "$1");
-  html = html.replace(/(<\/pre>)<\/p>/g, "$1");
-  html = html.replace(/<p>(<blockquote>)/g, "$1");
-  html = html.replace(/(<\/blockquote>)<\/p>/g, "$1");
-  html = html.replace(/<p>(<hr \/>)/g, "$1");
-  html = html.replace(/(<hr \/>)<\/p>/g, "$1");
-  html = html.replace(/<p>(<li>)/g, "<ul>$1");
-  html = html.replace(/(<\/li>)<\/p>/g, "$1</ul>");
-
-  return html;
-}
