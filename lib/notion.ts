@@ -3,6 +3,7 @@ import { NotionToMarkdown } from "notion-to-md";
 import type {
   PageObjectResponse,
   RichTextItemResponse,
+  BlockObjectResponse,
 } from "@notionhq/client/build/src/api-endpoints";
 
 const notion = new Client({
@@ -11,7 +12,7 @@ const notion = new Client({
 
 const n2m = new NotionToMarkdown({ notionClient: notion });
 
-const DATABASE_ID = process.env.NOTION_DATABASE_ID!;
+const PARENT_PAGE_ID = process.env.NOTION_DATABASE_ID!;
 
 export interface Article {
   id: string;
@@ -33,7 +34,7 @@ function slugify(text: string): string {
 }
 
 function getTitle(page: PageObjectResponse): string {
-  const prop = page.properties["Name"] || page.properties["Title"];
+  const prop = page.properties["Name"] || page.properties["Title"] || page.properties["title"];
   if (prop?.type === "title") {
     return (prop.title as RichTextItemResponse[])
       .map((t) => t.plain_text)
@@ -52,14 +53,6 @@ function getDescription(page: PageObjectResponse): string {
   return "";
 }
 
-function getDate(page: PageObjectResponse): string {
-  const prop = page.properties["Date"];
-  if (prop?.type === "date" && prop.date?.start) {
-    return prop.date.start;
-  }
-  return page.created_time.split("T")[0];
-}
-
 function getCover(page: PageObjectResponse): string | null {
   if (page.cover?.type === "external") {
     return page.cover.external.url;
@@ -71,36 +64,84 @@ function getCover(page: PageObjectResponse): string | null {
 }
 
 export async function getArticles(): Promise<Article[]> {
-  const response = await notion.databases.query({
-    database_id: DATABASE_ID,
-    filter: {
-      property: "Status",
-      status: {
-        equals: "Published",
-      },
-    },
-    sorts: [
-      {
-        timestamp: "created_time",
-        direction: "descending",
-      },
-    ],
+  // Get child blocks of the parent page to find child_page blocks
+  const blocks = await notion.blocks.children.list({
+    block_id: PARENT_PAGE_ID,
+    page_size: 100,
   });
 
-  return response.results
-    .filter((page): page is PageObjectResponse => "properties" in page)
-    .map((page) => {
-      const title = getTitle(page);
-      return {
-        id: page.id,
+  // Find all child_page blocks (these are the articles)
+  const childPageBlocks = blocks.results.filter(
+    (block): block is BlockObjectResponse =>
+      "type" in block && block.type === "child_page"
+  );
+
+  // Fetch full page data for each child page
+  const articles: Article[] = [];
+  for (const block of childPageBlocks) {
+    try {
+      const page = await notion.pages.retrieve({ page_id: block.id });
+      if (!("properties" in page)) continue;
+      const fullPage = page as PageObjectResponse;
+      const title = getTitle(fullPage);
+
+      // Skip section pages like "Insights" that aren't real articles
+      // Articles typically have longer titles
+      if (title.length < 10) continue;
+
+      articles.push({
+        id: fullPage.id,
         title,
         slug: slugify(title),
-        description: getDescription(page),
-        date: getDate(page),
-        lastEdited: page.last_edited_time,
-        cover: getCover(page),
-      };
-    });
+        description: getDescription(fullPage),
+        date: fullPage.created_time.split("T")[0],
+        lastEdited: fullPage.last_edited_time,
+        cover: getCover(fullPage),
+      });
+    } catch {
+      // Skip pages that can't be retrieved
+    }
+  }
+
+  // Also search for any sub-pages under child pages (e.g., articles inside "Insights")
+  for (const block of childPageBlocks) {
+    try {
+      const subBlocks = await notion.blocks.children.list({
+        block_id: block.id,
+        page_size: 100,
+      });
+      const subPages = subBlocks.results.filter(
+        (b): b is BlockObjectResponse =>
+          "type" in b && b.type === "child_page"
+      );
+      for (const subPage of subPages) {
+        try {
+          const page = await notion.pages.retrieve({ page_id: subPage.id });
+          if (!("properties" in page)) continue;
+          const fullPage = page as PageObjectResponse;
+          const title = getTitle(fullPage);
+          articles.push({
+            id: fullPage.id,
+            title,
+            slug: slugify(title),
+            description: getDescription(fullPage),
+            date: fullPage.created_time.split("T")[0],
+            lastEdited: fullPage.last_edited_time,
+            cover: getCover(fullPage),
+          });
+        } catch {
+          // Skip
+        }
+      }
+    } catch {
+      // Skip
+    }
+  }
+
+  // Sort by date descending
+  articles.sort((a, b) => b.date.localeCompare(a.date));
+
+  return articles;
 }
 
 export async function getArticleBySlug(
