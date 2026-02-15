@@ -138,8 +138,8 @@ export async function getArticles(): Promise<Article[]> {
     }
   }
 
-  // Sort by date descending
-  articles.sort((a, b) => b.date.localeCompare(a.date));
+  // Sort by date ascending (oldest first)
+  articles.sort((a, b) => a.date.localeCompare(b.date));
 
   return articles;
 }
@@ -154,5 +154,9 @@ export async function getArticleBySlug(
 export async function getArticleContent(pageId: string): Promise<string> {
   const mdBlocks = await n2m.pageToMarkdown(pageId);
   const mdString = n2m.toMarkdownString(mdBlocks);
-  return mdString.parent;
+  // Rewrite Notion S3 image URLs to go through our proxy so they don't expire
+  return mdString.parent.replace(
+    /!\[([^\]]*)\]\((https:\/\/prod-files-secure\.s3[^)]+)\)/g,
+    (_, alt, url) => `![${alt}](/api/notion-image?url=${encodeURIComponent(url)})`
+  );
 }
