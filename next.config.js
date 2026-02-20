@@ -1,17 +1,3 @@
-const { execSync } = require("child_process");
-
-// Generate static sitemap during build (env vars available here)
-if (process.env.NOTION_API_KEY && process.env.NODE_ENV === "production") {
-  try {
-    execSync("node scripts/generate-sitemap.mjs", {
-      stdio: "inherit",
-      env: process.env,
-    });
-  } catch {
-    console.warn("Sitemap generation failed, continuing build.");
-  }
-}
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
