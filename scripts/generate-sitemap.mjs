@@ -4,7 +4,12 @@ import { writeFileSync } from "fs";
 const SITE_URL =
   process.env.SITE_URL || "https://higher-education-signals.vercel.app";
 
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
+const apiKey = process.env.NOTION_API_KEY;
+console.log(
+  `NOTION_API_KEY: ${apiKey ? apiKey.slice(0, 8) + "..." + ` (${apiKey.length} chars)` : "NOT SET"}`
+);
+
+const notion = new Client({ auth: apiKey });
 const PARENT_PAGE_ID = process.env.NOTION_DATABASE_ID;
 
 function slugify(text) {
@@ -95,7 +100,13 @@ async function getArticles() {
 
 async function main() {
   console.log("Generating sitemap...");
-  const articles = await getArticles();
+  let articles = [];
+  try {
+    articles = await getArticles();
+  } catch (err) {
+    console.warn("Warning: Could not fetch articles from Notion:", err.message);
+    console.warn("Generating sitemap with homepage only.");
+  }
 
   const urls = [
     `  <url>
@@ -125,6 +136,6 @@ ${urls.join("\n")}
 }
 
 main().catch((err) => {
-  console.error("Failed to generate sitemap:", err);
-  process.exit(1);
+  console.error("Failed to generate sitemap:", err.message);
+  console.error("Build will continue without sitemap.");
 });
