@@ -4,12 +4,7 @@ import { writeFileSync } from "fs";
 const SITE_URL =
   process.env.SITE_URL || "https://higher-education-signals.vercel.app";
 
-const apiKey = process.env.NOTION_API_KEY;
-console.log(
-  `NOTION_API_KEY: ${apiKey ? apiKey.slice(0, 8) + "..." + ` (${apiKey.length} chars)` : "NOT SET"}`
-);
-
-const notion = new Client({ auth: apiKey });
+const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const PARENT_PAGE_ID = process.env.NOTION_DATABASE_ID;
 
 function slugify(text) {
